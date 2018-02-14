@@ -77,7 +77,7 @@ int main( int argc, char** argv )
          wdump((allowed_ips));
       }
 
-      fc::path data_dir;
+      fc::path data_dir(".");
       fc::logging_config cfg;
       fc::path log_dir = data_dir / "logs";
 
@@ -88,7 +88,7 @@ int main( int argc, char** argv )
       ac.rotation_interval    = fc::hours( 1 );
       ac.rotation_limit       = fc::days( 1 );
 
-      std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
+      std::cout << "Logging RPC to file: " << ac.filename.preferred_string() << "\n";
 
       cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config())));
       cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac)));
