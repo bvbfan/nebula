@@ -325,7 +325,7 @@ public:
         return impl::storage_ops<0, Types...>::apply(_tag, storage, v);
     }
 
-    static int count() { return impl::type_info<Types...>::count; }
+    static constexpr int count() { return impl::type_info<Types...>::count; }
     void set_which( int w ) {
       FC_ASSERT( w < count() );
       this->~static_variant();

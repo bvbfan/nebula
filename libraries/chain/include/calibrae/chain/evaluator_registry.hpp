@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/array.hpp>
 #include <calibrae/chain/evaluator.hpp>
 
 namespace calibrae { namespace chain {
@@ -9,11 +10,7 @@ class evaluator_registry
 {
    public:
       evaluator_registry( database& d )
-         : _db(d)
-      {
-         for( int i=0; i<OperationType::count(); i++ )
-             _op_evaluators.emplace_back();
-      }
+         : _db(d) { }
 
       template< typename EvaluatorType, typename... Args >
       void register_evaluator( Args... args )
@@ -35,7 +32,7 @@ class evaluator_registry
          return *eval;
       }
 
-      std::vector< std::unique_ptr< evaluator<OperationType> > > _op_evaluators;
+      boost::array< std::unique_ptr< evaluator<OperationType> >, OperationType::count() > _op_evaluators;
       database& _db;
 };
 
