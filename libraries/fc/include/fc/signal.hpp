@@ -22,8 +22,7 @@ namespace fc {
       template<typename Functor>
       connection_id_type connect( Functor&& f ) {
          fc::unique_lock<fc::mutex> lock(_mutex);
-         //auto c = new std::function<Signature>( fc::forward<Functor>(f) ); 
-         _handlers.push_back( std::make_shared<func_type>(f) );
+         _handlers.push_back( std::make_shared<func_type>(fc::forward<Functor>(f)) );
          return reinterpret_cast<connection_id_type>(_handlers.back().get());
       }
 #ifdef WIN32
@@ -97,9 +96,9 @@ namespace fc {
         auto itr = _handlers.begin();
         while( itr != _handlers.end() ) {
           if( reinterpret_cast<connection_id_type>(itr->get()) == cid ) {
-            _handlers.erase(itr);
-          }
-          ++itr;
+            itr = _handlers.erase(itr);
+          } else
+            ++itr;
         }
       }
       signal()
