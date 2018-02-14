@@ -8,6 +8,9 @@
 
 #include <boost/version.hpp>
 
+#define BOOST_COROUTINES_NO_DEPRECATION_WARNING
+#define BOOST_COROUTINE_NO_DEPRECATION_WARNING
+
 #if BOOST_VERSION >= 105400
 # include <boost/coroutine/stack_context.hpp>
   namespace bc  = boost::context;
@@ -45,11 +48,11 @@ namespace fc {
   struct context  {
     typedef fc::context* ptr;
 
-#if BOOST_VERSION >= 105400 // && BOOST_VERSION <= 106100 
+#if BOOST_VERSION >= 105400
     bco::stack_context stack_ctx;
 #endif
 
-#if BOOST_VERSION >= 106100 
+#if BOOST_VERSION >= 106100
     typedef bc::detail::transfer_t transfer_t;
 #else
     typedef intptr_t transfer_t;
@@ -70,26 +73,17 @@ namespace fc {
       cur_task(0),
       context_posted_num(0)
     {
+     const size_t stack_size = FC_CONTEXT_STACK_SIZE;
 #if BOOST_VERSION >= 106100
-     //  std::cerr<< "HERE: "<< BOOST_VERSION <<"\n";
-     //my_context = new bc::execution_context<intptr_t>( [=]( bc::execution_context<intptr_t> sink, intptr_t self  ){ std::cerr<<"in ex\n"; sf(self);  std::cerr<<"exit ex\n"; return sink; } );
-     size_t stack_size = FC_CONTEXT_STACK_SIZE;
      alloc.allocate(stack_ctx, stack_size);
      my_context = bc::detail::make_fcontext( stack_ctx.sp, stack_ctx.size, sf );
-#elif BOOST_VERSION >= 105600
-     size_t stack_size = FC_CONTEXT_STACK_SIZE;
-     alloc.allocate(stack_ctx, stack_size);
-     my_context = bc::make_fcontext( stack_ctx.sp, stack_ctx.size, sf); 
 #elif BOOST_VERSION >= 105400
-     size_t stack_size = FC_CONTEXT_STACK_SIZE;
      alloc.allocate(stack_ctx, stack_size);
      my_context = bc::make_fcontext( stack_ctx.sp, stack_ctx.size, sf);
 #elif BOOST_VERSION >= 105300
-     size_t stack_size = FC_CONTEXT_STACK_SIZE;
      void*  stackptr = alloc.allocate(stack_size);
      my_context = bc::make_fcontext( stackptr, stack_size, sf);
 #else
-     size_t stack_size = FC_CONTEXT_STACK_SIZE;
      my_context.fc_stack.base = alloc.allocate( stack_size );
      my_context.fc_stack.limit = static_cast<char*>( my_context.fc_stack.base) - stack_size;
      make_fcontext( &my_context, sf );
@@ -97,7 +91,7 @@ namespace fc {
     }
 
     context( fc::thread* t) :
-#if BOOST_VERSION >= 105600 && BOOST_VERSION <= 106100 
+#if BOOST_VERSION >= 105600
      my_context(nullptr),
 #elif BOOST_VERSION >= 105300
      my_context(new bc::fcontext_t),
@@ -116,20 +110,10 @@ namespace fc {
      cur_task(0),
      context_posted_num(0)
     {
-    
-#if BOOST_VERSION >= 106100
-       /*
-        bc::execution_context<intptr_t> tmp(  [=]( bc::execution_context<intptr_t> sink, intptr_t ) { std::cerr<<"get current\n"; return sink; } );
-        auto result = tmp(0);
-        my_context = new bc::execution_context<intptr_t>( std::move( std::get<0>(result) ) );
-        */
-#endif
     }
 
     ~context() {
-#if BOOST_VERSION >= 106100
-      // delete my_context;
-#elif BOOST_VERSION >= 105600
+#if BOOST_VERSION >= 105600
       if(stack_alloc)
         stack_alloc->deallocate( stack_ctx );
 #elif BOOST_VERSION >= 105400
@@ -234,10 +218,9 @@ namespace fc {
 
 
 
-#if BOOST_VERSION >= 106100 
-    //bc::execution_context<intptr_t>*   my_context;
+#if BOOST_VERSION >= 106100
     bc::detail::fcontext_t       my_context;
-#elif BOOST_VERSION >= 105300 && BOOST_VERSION < 105600
+#elif BOOST_VERSION >= 105300
     bc::fcontext_t*              my_context;
 #else
     bc::fcontext_t               my_context;
@@ -245,7 +228,7 @@ namespace fc {
     fc::context*                caller_context;
     stack_allocator*            stack_alloc;
     priority                     prio;
-    //promise_base*              prom; 
+    //promise_base*              prom;
     std::vector<blocked_promise> blocking_prom;
     time_point                   resume_time;
    // time_point                   ready_time; // time that this context was put on ready queue
