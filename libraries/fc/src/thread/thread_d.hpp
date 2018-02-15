@@ -64,7 +64,10 @@ namespace fc {
              {
                boost_thread->detach();
                delete boost_thread;
+               boost_thread = nullptr;
              }
+             clear_free_list();
+             cleanup_thread_specific_data();
            }
 
            fc::thread&             self;
@@ -392,23 +395,25 @@ namespace fc {
                 // jump to next context, saving current context
                 fc::context* prev = current;
                 current = next;
+                auto callback = this;
                 if (reschedule)
                 {
+                  callback = nullptr;
                   current->prio = priority::_internal__priority_for_short_sleeps();
                   add_context_to_ready_list(prev, true);
                 }
                 // slog( "jump to %p from %p", next, prev );
-                // fc_dlog( logger::get("fc_context"), "from ${from} to ${to}", ( "from", int64_t(prev) )( "to", int64_t(next) ) ); 
+                // fc_dlog( logger::get("fc_context"), "from ${from} to ${to}", ( "from", int64_t(prev) )( "to", int64_t(next) ) );
 #if BOOST_VERSION >= 106100
-                auto data = context_pair{ nullptr, prev };
+                auto data = context_pair{ callback, prev };
                 auto result = bc::detail::jump_fcontext(next->my_context, &data);
                 static_cast<context_pair*>(result.data)->second->my_context = result.fctx;
 #elif BOOST_VERSION >= 105600
-                bc::jump_fcontext( &prev->my_context, next->my_context, 0 );
+                bc::jump_fcontext( &prev->my_context, next->my_context, callback );
 #elif BOOST_VERSION >= 105300
-                bc::jump_fcontext( prev->my_context, next->my_context, 0 );
+                bc::jump_fcontext( prev->my_context, next->my_context, callback );
 #else
-                bc::jump_fcontext( &prev->my_context, &next->my_context, 0 );
+                bc::jump_fcontext( &prev->my_context, &next->my_context, callback );
 #endif
                 BOOST_ASSERT( current );
                 BOOST_ASSERT( current == prev );

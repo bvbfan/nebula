@@ -74,9 +74,9 @@ namespace fc {
       promise<void>::ptr p(new promise<void>("thread start"));
       boost::thread* t = new boost::thread( [this,p,name]() {
           try {
-            set_thread_name(name.c_str()); // set thread's name for the debugger to display
             this->my = new thread_d(*this);
             current_thread() = this;
+            this->set_name(name);
             p->set_value();
             exec();
           } catch ( fc::exception& e ) {
@@ -91,7 +91,6 @@ namespace fc {
       } );
       p->wait();
       my->boost_thread = t;
-      my->name = name;
       //wlog("name:${n} tid:${tid}", ("n", name)("tid", (uintptr_t)my->boost_thread->native_handle()) );
    }
    thread::thread( thread_d* ) {
@@ -100,11 +99,12 @@ namespace fc {
 
    thread::thread( thread&& m ) {
     my = m.my;
-    m.my = 0;
+    m.my = nullptr;
    }
 
    thread& thread::operator=(thread&& t ) {
       fc_swap(t.my,my);
+      t.my = nullptr;
       return *this;
    }
 
@@ -118,9 +118,18 @@ namespace fc {
    }
 
    thread& thread::current() {
-     if( !current_thread() )
-       current_thread() = new thread((thread_d*)0);
-     return *current_thread();
+     auto &t = current_thread();
+     if (!t)
+     {
+       t = new thread(nullptr);
+       // creating dummy thread is wrong
+       // furthermore to synchronize againt it will not work
+       // return value should be nullptr in main thread
+       // because it's not our thread
+       // it will be correct in future commit
+       t->my->name = "main";
+     }
+     return *t;
    }
 
    const string& thread::name()const
@@ -154,14 +163,15 @@ namespace fc {
     //If we have and know our attached boost thread, wait for it to finish, then return.
     if( &current() != this )
     {
-      async( [=](){quit();}, "thread::quit" );//.wait();
+      auto future = async( [=](){quit();}, "thread::quit" );
       if( my->boost_thread )
       {
         //wlog("destroying boost thread ${tid}",("tid",(uintptr_t)my->boost_thread->native_handle()));
         my->boost_thread->join();
-        delete my;
-        my = nullptr;
       }
+      future.wait();
+      delete my;
+      my = nullptr;
       return;
     }
 
@@ -200,8 +210,6 @@ namespace fc {
       scheduled_task->set_exception(std::make_shared<canceled_exception>(FC_LOG_MESSAGE(error, "cancellation reason: thread quitting")));
     my->task_sch_queue.clear();
 
-
-
     // move all sleep tasks to ready
     for( uint32_t i = 0; i < my->sleep_pqueue.size(); ++i )
       my->add_context_to_ready_list( my->sleep_pqueue[i] );
@@ -220,16 +228,6 @@ namespace fc {
     // mark all ready tasks (should be everyone)... as canceled
     for (fc::context* ready_context : my->ready_heap)
       ready_context->canceled = true;
-
-    // now that we have poked all fibers... switch to the next one and
-    // let them all quit.
-    while (!my->ready_heap.empty())
-    {
-      my->start_next_fiber(true);
-      my->check_for_timeouts();
-    }
-    my->clear_free_list();
-    my->cleanup_thread_specific_data();
   }
 
    void thread::exec()
@@ -246,7 +244,7 @@ namespace fc {
         dlog( "thread canceled: ${e}", ("e", e.to_detail_string()) );
       }
       delete my->current;
-      my->current = 0;
+      my->current = nullptr;
    }
 
    bool thread::is_running()const
