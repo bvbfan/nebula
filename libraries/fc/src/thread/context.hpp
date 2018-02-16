@@ -220,7 +220,7 @@ namespace fc {
 
 #if BOOST_VERSION >= 106100
     bc::detail::fcontext_t       my_context;
-#elif BOOST_VERSION >= 105300
+#elif BOOST_VERSION >= 105300 && BOOST_VERSION < 105600
     bc::fcontext_t*              my_context;
 #else
     bc::fcontext_t               my_context;
